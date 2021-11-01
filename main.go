@@ -14,11 +14,11 @@ type Page struct {
 	Body  []byte
 }
 
-// This method will save the Page's Body to a text file.
+// This method will save the Page's Body to a text file with .page extension.
 // For simplicity, we will use the Title as the file name.
 // All pages will be stored in 'pages' directory.
 func (p *Page) save() error {
-	filename := p.Title + ".txt"
+	filename := p.Title + ".page"
 	filepath := "pages/" + filename
 	return ioutil.WriteFile(filepath, p.Body, 0600)
 }
@@ -26,7 +26,7 @@ func (p *Page) save() error {
 // loadPage constructs the file name from the title parameter, reads the file's contents into a new variable body,
 // and returns a pointer to a Page literal constructed with the proper title and body values.
 func loadPage(title string) (*Page, error) {
-	filename := title + ".txt"
+	filename := title + ".page"
 	filepath := "pages/" + filename
 	body, err := ioutil.ReadFile(filepath)
 	if err != nil {
@@ -96,6 +96,9 @@ func main() {
 	http.HandleFunc("/view/", viewHandler)
 	http.HandleFunc("/edit/", editHandler)
 	http.HandleFunc("/save/", saveHandler)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/view/Welcome", http.StatusFound)
+	})
 
 	port := "8080"
 	fmt.Printf("Listening on port: %s...\n", port)
