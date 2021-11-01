@@ -8,6 +8,10 @@ import (
 	"net/http"
 )
 
+// Parsing all templates into a single *Template.
+// Then we can use the ExecuteTemplate method to render a specific template.
+var parsedTemplates = template.Must(template.ParseFiles("templates/edit.html", "templates/view.html"))
+
 // Page struct describes how page data will be stored in memory.
 type Page struct {
 	Title string
@@ -37,20 +41,12 @@ func loadPage(title string) (*Page, error) {
 
 // renderTemplate parses and executes the template, then writing generated HTML to http.ResponseWriter.
 func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
-	// The function template.ParseFiles will read the contents of tmpl and return a *template.Template.
-	t, err := template.ParseFiles("templates/" + tmpl)
+	err := parsedTemplates.ExecuteTemplate(w, tmpl, p)
 	if err != nil {
 		// Log error to the standard logger (stdout).
 		log.Println("Func renderTemplate: ", err)
 		// The http.Error function sends a specified HTTP response code (in this case "Internal Server Error")
 		// and error message to http.ResponseWriter.
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// The method t.Execute executes the template, writing the generated HTML to the http.ResponseWriter.
-	err = t.Execute(w, p)
-	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
