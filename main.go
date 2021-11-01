@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -34,19 +33,6 @@ func (p *Page) save() error {
 	return ioutil.WriteFile(filepath, p.Body, 0600)
 }
 
-// getTitle uses the validPath expression to validate path and extract the page title.
-// If the title is valid, it will be returned along with a nil error value.
-// If the title is invalid, the function will write a "404 Not Found" error to the HTTP connection,
-// and return an error to the handler. To create a new error, we have to import the errors package.
-func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
-	m := validPath.FindStringSubmatch(r.URL.Path)
-	if m == nil {
-		http.NotFound(w, r)
-		return "", errors.New("invalid Page Title")
-	}
-	return m[2], nil // The title is the second subexpression.
-}
-
 // loadPage constructs the file name from the title parameter, reads the file's contents into a new variable body,
 // and returns a pointer to a Page literal constructed with the proper title and body values.
 func loadPage(title string) (*Page, error) {
@@ -71,15 +57,22 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
 	}
 }
 
+// make Handler is a wrapper function that takes a function of the above type, and returns a function
+// of type http.HandlerFunc (suitable to be passed to the function http.HandleFunc)
+func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		m := validPath.FindStringSubmatch(r.URL.Path)
+		if m == nil {
+			http.NotFound(w, r)
+			return
+		}
+		fn(w, r, m[2])
+	}
+}
+
 // viewHandler will allow users to view a wiki page.
 // It will handle URLs prefixed with "/view/".
-func viewHandler(w http.ResponseWriter, r *http.Request) {
-	title, err := getTitle(w, r)
-	if err != nil {
-		log.Println("Func viewHandler: ", err)
-		return
-	}
-
+func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
 	p, err := loadPage(title)
 	if err != nil {
 		// err != nil means that page file not exsist. Print the log and redirect to editHandler route.
@@ -94,13 +87,7 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // editHandler loads the page (or, if it doesn't exist, create an empty Page struct), and displays an HTML form.
-func editHandler(w http.ResponseWriter, r *http.Request) {
-	title, err := getTitle(w, r)
-	if err != nil {
-		log.Println("Func editHandler: ", err)
-		return
-	}
-
+func editHandler(w http.ResponseWriter, r *http.Request, title string) {
 	p, err := loadPage(title)
 	if err != nil {
 		// Return empty Page struct when err != nil.
@@ -112,18 +99,12 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // saveHandler will handle the submission of forms located on the edit pages.
-func saveHandler(w http.ResponseWriter, r *http.Request) {
-	title, err := getTitle(w, r)
-	if err != nil {
-		log.Println("Func saveHandler: ", err)
-		return
-	}
-
+func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
 	// Get body value from the POST request (<textarea name="body">, edit.html template).
 	body := r.FormValue("body")
 	p := &Page{Title: title, Body: []byte(body)}
 
-	err = p.save()
+	err := p.save()
 	if err != nil {
 		log.Println("Func saveHandler: ", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -135,9 +116,10 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	// Simple routing.
-	http.HandleFunc("/view/", viewHandler)
-	http.HandleFunc("/edit/", editHandler)
-	http.HandleFunc("/save/", saveHandler)
+	http.HandleFunc("/view/", makeHandler(viewHandler))
+	http.HandleFunc("/edit/", makeHandler(editHandler))
+	http.HandleFunc("/save/", makeHandler(saveHandler))
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/view/Welcome", http.StatusFound)
 	})
