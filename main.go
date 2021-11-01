@@ -1,16 +1,23 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"regexp"
 )
 
 // Parsing all templates into a single *Template.
 // Then we can use the ExecuteTemplate method to render a specific template.
 var parsedTemplates = template.Must(template.ParseFiles("templates/edit.html", "templates/view.html"))
+
+// The function regexp.MustCompile will parse and compile the regular expression, and return a regexp.Regexp.
+// MustCompile is distinct from Compile in that it will panic if the expression compilation fails, while
+// Compile returns an error as a second parameter.
+var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
 
 // Page struct describes how page data will be stored in memory.
 type Page struct {
@@ -25,6 +32,19 @@ func (p *Page) save() error {
 	filename := p.Title + ".page"
 	filepath := "pages/" + filename
 	return ioutil.WriteFile(filepath, p.Body, 0600)
+}
+
+// getTitle uses the validPath expression to validate path and extract the page title.
+// If the title is valid, it will be returned along with a nil error value.
+// If the title is invalid, the function will write a "404 Not Found" error to the HTTP connection,
+// and return an error to the handler. To create a new error, we have to import the errors package.
+func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
+	m := validPath.FindStringSubmatch(r.URL.Path)
+	if m == nil {
+		http.NotFound(w, r)
+		return "", errors.New("invalid Page Title")
+	}
+	return m[2], nil // The title is the second subexpression.
 }
 
 // loadPage constructs the file name from the title parameter, reads the file's contents into a new variable body,
@@ -54,8 +74,12 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
 // viewHandler will allow users to view a wiki page.
 // It will handle URLs prefixed with "/view/".
 func viewHandler(w http.ResponseWriter, r *http.Request) {
-	// [len("/view/"):]	means that everything after "/view/" will be taken.
-	title := r.URL.Path[len("/view/"):]
+	title, err := getTitle(w, r)
+	if err != nil {
+		log.Println("Func viewHandler: ", err)
+		return
+	}
+
 	p, err := loadPage(title)
 	if err != nil {
 		// err != nil means that page file not exsist. Print the log and redirect to editHandler route.
@@ -71,8 +95,11 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 
 // editHandler loads the page (or, if it doesn't exist, create an empty Page struct), and displays an HTML form.
 func editHandler(w http.ResponseWriter, r *http.Request) {
-	// [len("/edit/"):]	means that everything after "/edit/" will be taken.
-	title := r.URL.Path[len("/edit/"):]
+	title, err := getTitle(w, r)
+	if err != nil {
+		log.Println("Func editHandler: ", err)
+		return
+	}
 
 	p, err := loadPage(title)
 	if err != nil {
@@ -86,13 +113,17 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 
 // saveHandler will handle the submission of forms located on the edit pages.
 func saveHandler(w http.ResponseWriter, r *http.Request) {
-	title := r.URL.Path[len("/save/"):]
+	title, err := getTitle(w, r)
+	if err != nil {
+		log.Println("Func saveHandler: ", err)
+		return
+	}
 
 	// Get body value from the POST request (<textarea name="body">, edit.html template).
 	body := r.FormValue("body")
 	p := &Page{Title: title, Body: []byte(body)}
 
-	err := p.save()
+	err = p.save()
 	if err != nil {
 		log.Println("Func saveHandler: ", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
