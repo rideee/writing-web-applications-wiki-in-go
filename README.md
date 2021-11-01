@@ -39,7 +39,7 @@ You can check this using:
   ...
 </pre>
 
-### What is GO111MODULE?
+#### What is GO111MODULE?
 
 > From **Go version 1.11**, the way to deal with modules was **revamped**.
 >
@@ -80,7 +80,7 @@ You can check this using:
 - [Go to -> Official - Detailed reference on modules](https://golang.org/ref/mod)
 - [Go to -> Official - Private Module Privacy](https://golang.org/ref/mod#private-module-privacy)
 
-### Solution
+#### Solution
 
 The easiest way to fix the problem is to set **GO111MODULE** environment
 variable to **auto**, using **go env** command (like below), then verify also by
