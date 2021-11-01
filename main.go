@@ -40,11 +40,19 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
 	// The function template.ParseFiles will read the contents of tmpl and return a *template.Template.
 	t, err := template.ParseFiles("templates/" + tmpl)
 	if err != nil {
+		// Log error to the standard logger (stdout).
 		log.Println("Func renderTemplate: ", err)
+		// The http.Error function sends a specified HTTP response code (in this case "Internal Server Error")
+		// and error message to http.ResponseWriter.
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	// The method t.Execute executes the template, writing the generated HTML to the http.ResponseWriter.
-	t.Execute(w, p)
+	err = t.Execute(w, p)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 // viewHandler will allow users to view a wiki page.
@@ -87,7 +95,14 @@ func saveHandler(w http.ResponseWriter, r *http.Request) {
 	// Get body value from the POST request (<textarea name="body">, edit.html template).
 	body := r.FormValue("body")
 	p := &Page{Title: title, Body: []byte(body)}
-	p.save()
+
+	err := p.save()
+	if err != nil {
+		log.Println("Func saveHandler: ", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	http.Redirect(w, r, "/view/"+title, http.StatusFound)
 }
 
