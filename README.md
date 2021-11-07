@@ -10,18 +10,15 @@ _It may be slightly different from the original (more comments etc.)._
 <pre>
   $ git clone https://github.com/rideee/writing-web-applications-wiki-in-go
   $ cd writing-web-applications-wiki-in-go
-  $ go mod tidy
+  $ go get -u .
   $ go run .
 </pre>
 
 ## Troubleshooting
 
-### **[Error]** go: modules disabled by GO111MODULE=off (...)
-
-Error occurs when using 'go mod tidy':
+### go: modules disabled by GO111MODULE=off (...)
 
 <pre>
-  $ go mod tidy
   go: modules disabled by GO111MODULE=off; see 'go help modules'
 </pre>
 
